@@ -1,0 +1,547 @@
+import 'dart:async';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:wakelock/wakelock.dart';
+
+void main() {
+  runApp(CitizenCalculatorApp());
+}
+
+class CitizenCalculatorApp extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      home: CitizenCalculator(),
+    );
+  }
+}
+
+class CitizenCalculator extends StatefulWidget {
+  @override
+  _CitizenCalculatorState createState() => _CitizenCalculatorState();
+}
+
+class _CitizenCalculatorState extends State<CitizenCalculator> {
+  String input = "";
+  String currentOperator = "";
+  String result = "";
+  List<CalculationEntry> history = [];
+  List<String> numbers = [];
+  List<String> operators = [];
+  List<String> chk = [];
+  int checkStep = 0;
+  int flag = 0;
+  String buttonPressed = "";
+  @override
+void initState() {
+  super.initState();
+  // Enable wakelock when the app starts
+  Wakelock.enable();
+}
+//
+@override
+void dispose() {
+  // Release wakelock when the app is disposed
+  Wakelock.disable();
+  super.dispose();
+}
+
+  void _buttonPressed(String buttonText) {
+    String temp="";
+    setState(() {
+      if (buttonText == "AC") {
+        input = "";
+        currentOperator = "";
+        result = "";
+        numbers.clear();
+        chk.clear();
+        operators.clear();
+        checkStep = 0;
+        flag = 0;
+     } else if (buttonText == "=") {
+        if (currentOperator.isNotEmpty && input.isNotEmpty && (input.endsWith('0') || input.endsWith('1') || input.endsWith('2') || input.endsWith('3') || input.endsWith('4') || input.endsWith('5') || input.endsWith('6') || input.endsWith('7') || input.endsWith('8') || input.endsWith('9'))) {
+          RegExp regex = RegExp(r'(\d+)([+\-*/])(\d+)');
+          RegExpMatch? match = regex.firstMatch(input);
+          if (match != null) {
+           // Extract matched groups
+           String operator = match.group(2)!;
+           String number2 = match.group(3)!;
+           // Combine the extracted parts into the desired format
+           temp = '$operator$number2';
+           // Print the result
+          }
+          numbers.add(temp);
+          chk.add(input);
+          operators.add(currentOperator);
+          result = evaluateExpression(input);
+           // Parse the result as a double
+          double parsedResult = double.tryParse(result) ?? 0.0;
+          // Check if the parsed result is an integer
+          if (parsedResult % 1 == 0) {
+          // If the parsed result is an integer, display it without decimals
+          result = parsedResult.toInt().toString();
+          } else {
+          // If it's not an integer, keep the result as is
+          result = parsedResult.toString();
+          }
+          //result = evaluateExpression(input);
+          numbers.add(result);
+          chk.add(result);
+          operators.add(" ");
+          numbers.insert(0, chk[0]);
+          numbers.removeAt(1);
+          history.add(CalculationEntry.fromSteps(numbers, DateTime.now()));
+          input = result;
+          currentOperator = "";
+        	checkStep = 0;
+
+          // Enforce history limit
+          if (history.length > 2) {
+            history.removeAt(0); // Remove the oldest entry
+          }
+        }
+      } else if (buttonText == "Check") {
+  if (checkStep < chk.length-1) {
+    if (checkStep == 0 && flag == 0) {
+      final values = chk[checkStep].split(RegExp(r'[+\-*/]'));
+      result = values[0];
+      flag = 1;
+    } else if (checkStep < chk.length - 1 && flag != 0) {
+      final values = chk[checkStep].split(RegExp(r'[+\-*/]'));
+      result = values[1];
+      currentOperator = operators[checkStep];
+      checkStep++;
+    } else {
+      final values = chk[checkStep].split(RegExp(r'[+\-*/]'));
+      result = values[1];
+      currentOperator = operators[checkStep];
+      checkStep++;
+    }
+  } else {
+    // Reset operators and result fields when checkStep exceeds chk.length
+    currentOperator = "";
+    result = "";
+    checkStep = 0; // Reset checkStep to 0 as well
+    flag = 0;
+  }
+}
+ 
+      else if(buttonText == "0"){
+        if (input != "0") {
+              input += buttonText;
+            }
+        else{
+          input="0";
+        }
+      }else if(buttonText == "00"){
+        if (input != "0" && input != "") {
+              input += buttonText;
+            }
+        else{
+          input="0";
+        }
+      }else if (buttonText == "<--") {
+        if (input.isNotEmpty) {
+          input = input.substring(0, input.length - 1);
+        }
+      } else if (RegExp(r'[1-9]').hasMatch(buttonText)) {
+        if(input != "0"){
+        input += buttonText;
+        }
+        else{
+          input=buttonText;
+        }
+      } else if (buttonText == "+" ||
+          buttonText == "-" ||
+          buttonText == "*" ||
+          buttonText == "/") {
+        if (currentOperator.isEmpty) {
+          if (input.isNotEmpty) {
+            currentOperator = buttonText;
+            input += buttonText;
+          }
+        } else {
+            if (input.isNotEmpty) {
+              if (RegExp(r'[0-9]').hasMatch(input[input.length - 1])) {
+                RegExp regex = RegExp(r'(\d+)([+\-*/])(\d+)');
+            RegExpMatch? match = regex.firstMatch(input);
+            if (match != null) {
+             // Extract matched groups
+             String operator = match.group(2)!;
+             String number2 = match.group(3)!;
+             // Combine the extracted parts into the desired format
+             temp = '$operator$number2';
+             operators.add(operator);
+             // Print the result
+            }
+            numbers.add(temp);
+              chk.add(input);
+              result = evaluateExpression(input);
+              input = result + buttonText;
+              currentOperator = buttonText;
+              checkStep = 0;
+            }
+          }
+        }
+      }   else if (buttonText == "%") {
+        String tep="";
+    if (currentOperator.isNotEmpty && input.isNotEmpty && (input.endsWith('0') || input.endsWith('1') || input.endsWith('2') || input.endsWith('3') || input.endsWith('4') || input.endsWith('5') || input.endsWith('6') || input.endsWith('7') || input.endsWith('8') || input.endsWith('9'))) {
+      // Extract the last number and calculate its percentage of the first number
+      final parts = input.split(RegExp(r'[+\-*/]'));
+      if (parts.length == 2) {
+        final number1 = double.parse(parts[0]);
+        final number2 = double.parse(parts[1]);
+        final operator = input[parts[0].length];
+        double percentageValue;
+        switch (operator) {
+          case '+':
+            percentageValue = number1 + (number1 * (number2 / 100.0));
+            break;
+          case '-':
+            percentageValue = number1 - (number1 * (number2 / 100.0));
+            break;
+          case '*':
+            percentageValue = number1 * (1 + number2 / 100.0);
+            break;
+          case '/':
+            percentageValue = number1 / (1 + number2 / 100.0);
+            break;
+          default:
+            // Handle unsupported operators, or you can set a default behavior
+            return;
+        }
+          String per='%';
+          // Extract matched groups
+          String ope = operator.toString();
+          String n2 = number2.toString();
+          // Combine the extracted parts into the desired format
+          tep='$ope$n2$per';
+          numbers.add(tep);
+          chk.add(input);
+          operators.add("%");
+        String one='*1';
+        input = percentageValue.toString();
+        result = evaluateExpression('$input$one'); // Re-evaluate the expression if needed
+        currentOperator = "";
+        checkStep = 0;
+      }
+    }
+  }
+ else if (buttonText == ".") {
+        if(input.endsWith('0') || input.endsWith('1') || input.endsWith('2') || input.endsWith('3') || input.endsWith('4') || input.endsWith('5') || input.endsWith('6') || input.endsWith('7') || input.endsWith('8') || input.endsWith('9')){
+        input += buttonText;
+        }
+      }
+      // Provide haptic feedback on button press
+      HapticFeedback.mediumImpact();
+
+      // Store the pressed button for visual feedback
+      buttonPressed = buttonText;
+
+      // Reset buttonPressed after a brief delay
+      Timer(Duration(milliseconds: 100), () {
+        setState(() {
+          buttonPressed = "";
+        });
+      });
+    });
+  }
+
+String evaluateExpression(String expression) {
+  try {
+    // Convert operands to integers by multiplying them
+    final parts = expression.split(RegExp(r'[+\-*/]'));
+    final operand1 = double.parse(parts[0]) * 10; // Multiply by 10 (adjust as needed)
+    final operand2 = double.parse(parts[1]) * 10; // Multiply by 10 (adjust as needed)
+
+    // Perform the operation on integers
+    double intResult;
+    switch (expression[parts[0].length]) {
+      case '+':
+        intResult = (operand1 + operand2) / 10; // Divide by 10 to get the decimal representation
+        break;
+      case '-':
+        intResult = (operand1 - operand2) / 10; // Divide by 10 to get the decimal representation
+        break;
+      case '*':
+        intResult = (operand1 * operand2) / 100; // Divide by 100 to get the decimal representation
+        break;
+      case '/':
+        intResult = (operand1 / operand2); // Division, no need to multiply/divide
+        break;
+      default:
+        return "Error";
+    }
+
+    return intResult.toString(); // Return the exact result as a string
+  } catch (e) {
+    return "Error";
+  }
+}
+
+
+  void deleteHistoryEntry(int index) {
+    setState(() {
+      history.removeAt(index);
+    });
+  }
+
+  bool _isOperator(String buttonText) {
+    return buttonText == "+" || buttonText == "-" || buttonText == "*" || buttonText == "/";
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Citizen Calculator'),
+        backgroundColor: Colors.black,
+        actions: <Widget>[
+          IconButton(
+            icon: Icon(Icons.history),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => HistoryPage(history, deleteHistoryEntry),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+      body: Container(
+        color: Colors.black, // Set the background color to black
+        margin: EdgeInsets.only(bottom: 16.0), // Add a bottom margin
+        child: OrientationBuilder(
+          builder: (context, orientation) {
+            return SingleChildScrollView(
+              child: Column(
+                children: <Widget>[
+                  Container(
+                    padding: EdgeInsets.all(20.0),
+                    alignment: Alignment.centerRight,
+                    child: Text(
+                      input,
+                      style: TextStyle(fontSize: 24, color: Colors.white), // Set text color to white
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Container(
+                    padding: EdgeInsets.all(20.0),
+                    alignment: Alignment.centerRight,
+                    child: Text(
+                      currentOperator,
+                      style: TextStyle(fontSize: 24, color: Colors.white), // Set text color to white
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Container(
+                    padding: EdgeInsets.all(20.0),
+                    alignment: Alignment.centerRight,
+                    child: Text(
+                      result,
+                      style: TextStyle(
+                        fontSize: 48,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white, // Set text color to white
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Row(
+                    children: <Widget>[
+                      buildButton("<--"),
+                      buildButton("AC"),
+                      buildButton("Check"),
+                    ],
+                  ),
+                  Row(
+                    children: <Widget>[
+                      buildButton("7"),
+                      buildButton("8"),
+                      buildButton("9"),
+                      buildButton("*"),
+                    ],
+                  ),
+                  Row(
+                    children: <Widget>[
+                      buildButton("4"),
+                      buildButton("5"),
+                      buildButton("6"),
+                      buildButton("-"),
+                    ],
+                  ),
+                  Row(
+                    children: <Widget>[
+                      buildButton("1"),
+                      buildButton("2"),
+                      buildButton("3"),
+                      buildButton("%"),
+                    ],
+                  ),
+                  Row(
+                    children: <Widget>[
+                      buildButton("0"),
+                      buildButton("00"),
+                      buildButton("."),
+                      buildButton("/"),
+                    ],
+                  ),
+                  Row(
+                    children: <Widget>[
+                      buildButton("="),
+                      buildButton("+"),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget buildButton(String buttonText) {
+    Color buttonColor;
+    Color textColor = Colors.black;
+
+    double buttonFontSize = 24.0; // Default font size
+
+    if (buttonText == "<--" || buttonText == "AC" || buttonText == "Check") {
+      // Set a smaller font size for specific buttons
+      buttonFontSize = 14.0;
+    }
+
+    if (buttonText == "Check" ||
+        buttonText == "<--" ||
+        buttonText == "*" ||
+        buttonText == "-" ||
+        buttonText == "%" ||
+        buttonText == "/") {
+      buttonColor = const Color.fromARGB(255, 71, 71, 71);
+      textColor = Colors.white;
+    } else if (buttonText == "+") {
+      buttonColor = Color.fromARGB(255, 255, 95, 31);
+      textColor = Colors.white;
+    } else if (buttonText == "AC") {
+      buttonColor = Color.fromARGB(255, 0, 127, 255);
+      textColor = Colors.white;
+    } else if (buttonText == "=") {
+      buttonColor = Colors.white;
+      textColor = Colors.black;
+    } else {
+      buttonColor = Color.fromARGB(255, 43, 43, 43);
+      textColor = Colors.white;
+    }
+
+    return Expanded(
+      child: Material(
+        elevation: 0, // Remove the shadow
+        child: InkWell(
+          onTap: () => _buttonPressed(buttonText),
+          splashColor: Colors.white, // Color of the splash effect
+          highlightColor: Colors.transparent, // No highlight color
+          child: AnimatedOpacity(
+            duration: Duration(milliseconds: 200), // Set the duration of the animation
+            opacity: buttonPressed == buttonText ? 0.5 : 1.0,
+            child: Container(
+              decoration: BoxDecoration(
+                color: _isOperator(buttonText)
+                    ? (buttonPressed == buttonText ? Colors.orange : buttonColor)
+                    : (buttonPressed == buttonText ? Colors.blue : buttonColor),
+                borderRadius: BorderRadius.circular(0),
+                border: Border.all(color: const Color.fromARGB(255, 0, 0, 0), width: 1.0), // Add a border
+              ),
+              alignment: Alignment.center,
+              padding: EdgeInsets.all(24.0),
+              child: Text(
+                buttonText,
+                style: TextStyle(
+                  fontSize: buttonFontSize,
+                  color: textColor,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class HistoryPage extends StatelessWidget {
+  final List<CalculationEntry> history;
+  final Function(int) deleteHistoryEntry;
+
+  HistoryPage(this.history, this.deleteHistoryEntry);
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('History'),
+        backgroundColor: Colors.black, // Set the background color of the app bar to black
+      ),
+      body: Container(
+        color: Colors.black, // Set the background color to black
+        child: ListView.builder(
+          itemCount: history.length,
+          itemBuilder: (context, index) {
+            final entry = history[index];
+            return Dismissible(
+              key: Key(entry.timestamp.toString()),
+              onDismissed: (direction) {
+                deleteHistoryEntry(index);
+              },
+              background: Container(
+                color: Colors.red,
+                child: Icon(
+                  Icons.delete,
+                  color: Colors.white,
+                  size: 36.0,
+                ),
+                alignment: Alignment.centerRight,
+                padding: EdgeInsets.only(right: 20),
+              ),
+              child: Column(
+                children: <Widget>[
+                  ListTile(
+                    title: Text(
+                      entry.expression,
+                      style: TextStyle(color: Colors.white), // Set text color to white
+                    ),
+                    subtitle: Text(
+                      "Result: ${entry.result}",
+                      style: TextStyle(color: Colors.white), // Set text color to white
+                    ),
+                    trailing: Text(
+                      entry.timestamp.toLocal().toString(),
+                      style: TextStyle(color: Colors.white), // Set text color to white
+                    ),
+                  ),
+                  Divider(height: 1, color: Colors.white), // Set divider color to white
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class CalculationEntry {
+  final String expression;
+  final String result;
+  final DateTime timestamp;
+
+  CalculationEntry(this.expression, this.result, this.timestamp);
+
+  factory CalculationEntry.fromSteps(List<String> steps, DateTime timestamp) {
+    final expression = steps.join("\n");
+    final result = steps.last;
+    return CalculationEntry(expression, result, timestamp);
+  }
+}
